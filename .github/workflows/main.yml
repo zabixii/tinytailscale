@@ -14,14 +14,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y binwalk squashfs-tools xz-utils git build-essential
-
-          # Optional: build sasquatch if needed for certain firmwares
-          git clone https://github.com/devttys0/sasquatch.git
-          cd sasquatch
-          make
-          sudo cp unsquashfs /usr/local/bin/
-          cd ..
+          sudo apt install -y binwalk squashfs-tools xz-utils curl
 
       - name: Download firmware
         run: |
@@ -30,13 +23,11 @@ jobs:
       - name: Extract firmware
         run: |
           mkdir extracted
-          binwalk -e firmware.bin --directory extracted
+          # Try binwalk first
+          binwalk -e firmware.bin --directory extracted || echo "Binwalk extraction failed, fallback to manual unsquashfs"
 
-          # Also manually try unsquashfs if binwalk failed to extract SquashFS
-          if [ -d extracted/_firmware.bin.extracted/squashfs-root ]; then
-            echo "SquashFS already extracted"
-          else
-            # Find the SquashFS offset in binwalk output
+          # If SquashFS folder doesn't exist, manually extract it
+          if [ ! -d extracted/_firmware.bin.extracted/squashfs-root ]; then
             OFFSET=$(binwalk firmware.bin | grep Squashfs | awk '{print $1}')
             dd if=firmware.bin bs=1 skip=$OFFSET of=squashfs.img
             mkdir extracted/squashfs
