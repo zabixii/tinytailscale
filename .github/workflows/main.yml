@@ -1,10 +1,7 @@
 name: Extract MT7612U Driver
 
 on:
-  workflow_dispatch: # manually trigger
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   extract_driver:
@@ -38,9 +35,9 @@ jobs:
         run: |
           dd if=firmware.bin bs=1 skip=$OFFSET of=firmware_squashfs.img status=progress
 
-      - name: UnsquashFS
+      - name: UnsquashFS (ignore device errors)
         run: |
-          unsquashfs -d extracted/squashfs firmware_squashfs.img
+          unsquashfs -d extracted/squashfs firmware_squashfs.img || true
 
       - name: Find MT7612U drivers
         run: |
