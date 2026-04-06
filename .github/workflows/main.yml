@@ -1,0 +1,34 @@
+name: Extract MT7612U Driver
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract_driver:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y binwalk squashfs-tools xz-utils
+
+      - name: Download firmware
+        run: |
+          wget -O firmware.bin "https://gitlab.com/xchwarze/wifi-pineapple-cloner-builds/-/raw/main/releases/gl-mt300n-v2-universal-sysupgrade.bin"
+
+      - name: Extract firmware
+        run: |
+          binwalk -e firmware.bin
+          # SquashFS is usually extracted to _firmware.bin.extracted
+          cd _firmware.bin.extracted
+          find . -name "mt7612u*.ko" > driver_list.txt
+
+      - name: Upload driver artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: mt7612u-driver
+          path: _firmware.bin.extracted/$(cat _firmware.bin.extracted/driver_list.txt)
