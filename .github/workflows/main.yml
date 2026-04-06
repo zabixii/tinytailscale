@@ -1,12 +1,7 @@
-name: Extract MT7612U Drivers
+name: Extract MT7612U Driver
 
 on:
   workflow_dispatch:
-    inputs:
-      firmware:
-        description: 'Firmware file name (must be in repo root)'
-        required: true
-        default: 'firmware.bin'
 
 jobs:
   extract_driver:
@@ -18,42 +13,35 @@ jobs:
       - name: Install required tools
         run: |
           sudo apt update
-          sudo apt install -y binwalk lzma-utils xz-utils unzip gzip
+          sudo apt install -y binwalk xz-utils squashfs-tools gzip unzip
 
-      - name: Create extraction folders
+      - name: Prepare directories
         run: |
-          mkdir -p extracted kernel_extract
+          mkdir -p extracted extracted/squashfs
 
-      - name: Get kernel offset and size
-        id: kernel_info
+      - name: Find SquashFS offset
+        id: squash_offset
         run: |
-          OFFSET=$(binwalk ${{ github.event.inputs.firmware }} | grep 'uImage header' | awk '{print $1}')
-          SIZE=$(binwalk ${{ github.event.inputs.firmware }} | grep 'uImage header' | awk '{print $9}')
+          OFFSET=$(binwalk firmware.bin | grep Squashfs | awk '{print $1}')
+          echo "SquashFS offset: $OFFSET"
           echo "OFFSET=$OFFSET" >> $GITHUB_ENV
-          echo "SIZE=$SIZE" >> $GITHUB_ENV
-          echo "Kernel offset: $OFFSET"
-          echo "Kernel size: $SIZE"
 
-      - name: Extract kernel image from firmware
+      - name: Extract SquashFS image
         run: |
-          dd if=${{ github.event.inputs.firmware }} bs=1 skip=$OFFSET count=$SIZE of=kernel.img status=progress
+          dd if=firmware.bin bs=1 skip=$OFFSET of=firmware_squashfs.img status=progress
 
-      - name: Decompress LZMA kernel
+      - name: Unsquash filesystem
         run: |
-          lzma -d -k kernel.img  # produces kernel.img.out
+          # Avoid superuser errors; ignore device creation failures
+          unsquashfs -d extracted/squashfs firmware_squashfs.img || true
 
-      - name: Extract files from kernel using binwalk
+      - name: Find MT7612U drivers
         run: |
-          binwalk -e kernel.img.out
+          find extracted/squashfs -type f -name '*7612*.ko' > driver_list.txt
+          cat driver_list.txt
 
-      - name: Find MT7612U driver modules
-        run: |
-          mkdir -p extracted/mt7612
-          find _kernel.img.out.extracted -type f -name '*7612*.ko' -exec cp {} extracted/mt7612/ \;
-          find extracted/mt7612 -type f
-
-      - name: Upload extracted drivers as artifact
+      - name: Upload extracted drivers
         uses: actions/upload-artifact@v4
         with:
           name: mt7612u-driver
-          path: extracted/mt7612
+          path: driver_list.txt
