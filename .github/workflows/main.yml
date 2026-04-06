@@ -1,20 +1,27 @@
 name: Extract MT7612U Driver
 
 on:
-  workflow_dispatch:  # manually trigger
+  workflow_dispatch:
 
 jobs:
   extract_driver:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y binwalk squashfs-tools xz-utils findutils
+          sudo apt install -y binwalk squashfs-tools xz-utils git build-essential
+
+          # Optional: build sasquatch if needed for certain firmwares
+          git clone https://github.com/devttys0/sasquatch.git
+          cd sasquatch
+          make
+          sudo cp unsquashfs /usr/local/bin/
+          cd ..
 
       - name: Download firmware
         run: |
@@ -25,14 +32,26 @@ jobs:
           mkdir extracted
           binwalk -e firmware.bin --directory extracted
 
+          # Also manually try unsquashfs if binwalk failed to extract SquashFS
+          if [ -d extracted/_firmware.bin.extracted/squashfs-root ]; then
+            echo "SquashFS already extracted"
+          else
+            # Find the SquashFS offset in binwalk output
+            OFFSET=$(binwalk firmware.bin | grep Squashfs | awk '{print $1}')
+            dd if=firmware.bin bs=1 skip=$OFFSET of=squashfs.img
+            mkdir extracted/squashfs
+            unsquashfs -d extracted/squashfs squashfs.img
+          fi
+
       - name: Find MT7612U driver
         run: |
           find extracted -type f -name '*7612*.ko' > driver_list.txt
-          echo "Found drivers:"
           cat driver_list.txt
 
       - name: Upload driver artifact
         uses: actions/upload-artifact@v4
         with:
           name: mt7612u-driver
-          path: driver_list.txt
+          path: |
+            driver_list.txt
+            extracted/**/7612*.ko
