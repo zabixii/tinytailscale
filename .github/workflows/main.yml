@@ -1,48 +1,56 @@
 name: Extract MT7612U Driver
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # manually trigger
+  push:
+    branches:
+      - main
 
 jobs:
   extract_driver:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y binwalk squashfs-tools xz-utils curl
+          sudo apt install -y binwalk squashfs-tools xz-utils wget
 
       - name: Download firmware
         run: |
-          curl -L -o firmware.bin https://gitlab.com/xchwarze/wifi-pineapple-cloner-builds/-/raw/main/releases/gl-mt300n-v2-universal-sysupgrade.bin
+          wget -O firmware.bin "https://gitlab.com/xchwarze/wifi-pineapple-cloner-builds/-/raw/main/releases/gl-mt300n-v2-universal-sysupgrade.bin"
 
-      - name: Extract firmware
+      - name: Make extraction directories
         run: |
-          mkdir extracted
-          # Try binwalk first
-          binwalk -e firmware.bin --directory extracted || echo "Binwalk extraction failed, fallback to manual unsquashfs"
+          mkdir -p extracted extracted/squashfs
 
-          # If SquashFS folder doesn't exist, manually extract it
-          if [ ! -d extracted/_firmware.bin.extracted/squashfs-root ]; then
-            OFFSET=$(binwalk firmware.bin | grep Squashfs | awk '{print $1}')
-            dd if=firmware.bin bs=1 skip=$OFFSET of=squashfs.img
-            mkdir extracted/squashfs
-            unsquashfs -d extracted/squashfs squashfs.img
-          fi
-
-      - name: Find MT7612U driver
+      - name: Locate SquashFS offset
+        id: offset
         run: |
-          find extracted -type f -name '*7612*.ko' > driver_list.txt
+          OFFSET=$(binwalk firmware.bin | grep Squashfs | awk '{print $1}')
+          echo "SquashFS offset: $OFFSET"
+          echo "OFFSET=$OFFSET" >> $GITHUB_ENV
+
+      - name: Extract SquashFS image
+        run: |
+          dd if=firmware.bin bs=1 skip=$OFFSET of=firmware_squashfs.img status=progress
+
+      - name: UnsquashFS
+        run: |
+          unsquashfs -d extracted/squashfs firmware_squashfs.img
+
+      - name: Find MT7612U drivers
+        run: |
+          find extracted/squashfs -type f -name '*7612*.ko' > driver_list.txt
           cat driver_list.txt
 
-      - name: Upload driver artifact
+      - name: Upload driver files
         uses: actions/upload-artifact@v4
         with:
           name: mt7612u-driver
           path: |
             driver_list.txt
-            extracted/**/7612*.ko
+            extracted/squashfs/**/7612*.ko
