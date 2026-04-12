@@ -1,0 +1,49 @@
+name: Decompile APK with Apktool
+
+on:
+  workflow_dispatch:
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y wget unzip openjdk-17-jre
+
+      - name: Download apktool
+        run: |
+          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
+          echo -e '#!/bin/bash\njava -jar apktool.jar "$@"' > apktool
+          chmod +x apktool
+
+      - name: Download APK ZIP
+        run: |
+          wget https://protomines.ddns.net/apk/MapWorld-apk.zip -O app.zip
+
+      - name: Extract APK
+        run: |
+          unzip app.zip -d extracted
+          ls extracted
+
+      - name: Find APK file
+        id: find_apk
+        run: |
+          APK_PATH=$(find extracted -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+
+      - name: Decompile APK
+        run: |
+          mkdir output
+          ./apktool d "${{ steps.find_apk.outputs.apk_path }}" -o output
+
+      - name: Upload Decompiled Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: decompiled-apk
+          path: output
