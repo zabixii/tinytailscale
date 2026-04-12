@@ -1,4 +1,4 @@
-name: Decompile APK with Apktool
+name: Decompile APK (Apktool)
 
 on:
   workflow_dispatch:
@@ -28,6 +28,8 @@ jobs:
 
       - name: Extract APK
         run: |
+          rm -rf extracted
+          mkdir -p extracted
           unzip app.zip -d extracted
 
       - name: Find APK file
@@ -36,10 +38,13 @@ jobs:
           APK_PATH=$(find extracted -name "*.apk" | head -n 1)
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
 
-      - name: Decompile APK
+      - name: Clean previous output
         run: |
-          mkdir -p output
-          java -jar apktool.jar d "${{ steps.find_apk.outputs.apk_path }}" -o output
+          rm -rf output
+
+      - name: Decompile APK with Apktool
+        run: |
+          java -jar apktool.jar d "${{ steps.find_apk.outputs.apk_path }}" -o output -f
 
       - name: Upload Decompiled Files
         uses: actions/upload-artifact@v4
