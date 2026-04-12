@@ -16,10 +16,10 @@ jobs:
           sudo apt update
           sudo apt install -y wget unzip openjdk-17-jre
 
-      - name: Download apktool
+      - name: Download latest apktool
         run: |
-          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
-          echo -e '#!/bin/bash\njava -jar apktool.jar "$@"' > apktool
+          wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool.jar
           chmod +x apktool
 
       - name: Download APK ZIP
@@ -29,7 +29,6 @@ jobs:
       - name: Extract APK
         run: |
           unzip app.zip -d extracted
-          ls extracted
 
       - name: Find APK file
         id: find_apk
@@ -39,11 +38,4 @@ jobs:
 
       - name: Decompile APK
         run: |
-          mkdir output
-          ./apktool d "${{ steps.find_apk.outputs.apk_path }}" -o output
-
-      - name: Upload Decompiled Files
-        uses: actions/upload-artifact@v4
-        with:
-          name: decompiled-apk
-          path: output
+          ./apktool d "${{ steps.find_apk.outputs.apk
