@@ -38,4 +38,10 @@ jobs:
 
       - name: Decompile APK
         run: |
-          ./apktool d "${{ steps.find_apk.outputs.apk
+          ./apktool d "${{ steps.find_apk.outputs.apk_path }}" -o output
+
+      - name: Upload Decompiled Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: decompiled-apk
+          path: output
