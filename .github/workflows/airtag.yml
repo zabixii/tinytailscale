@@ -19,34 +19,37 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Inject Real API Keys
+      - name: Inject API Keys (Use your own if maps are still white)
         run: |
           echo "MAPS_API_KEY=AIzaSyD_Dkqs1_ySU1epRSdJDI9Slvh6gF7XhUE" > secrets.properties
           echo "AMAP_API_KEY=ad1d1be237c02bfdeb1eb21cdd75ae36" >> secrets.properties
           echo "MAPS_API_KEY=AIzaSyD_Dkqs1_ySU1epRSdJDI9Slvh6gF7XhUE" > local.properties
 
-      - name: Brute Force UI (Kill Cyan & Force Padding)
+      - name: Smart Brute Force UI (Kill Cyan & Fix Padding)
         run: |
           python3 -c '
-          import os
+          import os, re
 
-          # 1. Kill Cyan by forcing ALL colors to Black/Dark Grey in colors.xml
+          # 1. Kill Cyan/Teal globally in colors.xml
           color_file = "app/src/main/res/values/colors.xml"
           if os.path.exists(color_file):
               with open(color_file, "r") as f:
                   data = f.read()
-              # Force typical accent colors to black
-              data = data.replace(">#FF018786<", ">#000000<") # Cyan/Teal
-              data = data.replace(">#FF03DAC5<", ">#000000<") # Light Teal
+              # Replaces typical Material cyan/teal hex codes with Black
+              data = re.sub(r">#FF018786<", ">#000000<", data)
+              data = re.sub(r">#FF03DAC5<", ">#000000<", data)
               with open(color_file, "w") as f:
                   f.write(data)
 
-          # 2. Force status bar color in all themes
+          # 2. Force Black Status Bar in all themes
           for root, dirs, files in os.walk("app/src/main/res"):
               if "themes.xml" in files:
                   path = os.path.join(root, "themes.xml")
                   with open(path, "r") as f:
                       data = f.read()
+                  
+                  # Inject black status bar and A15 opt-out before the end of styles
+                  # We use a non-greedy replace to catch multiple styles if they exist
                   injection = """
               <item name="android:statusBarColor">#000000</item>
               <item name="android:windowLightStatusBar">false</item>
@@ -56,18 +59,26 @@ jobs:
                   with open(path, "w") as f:
                       f.write(data)
 
-          # 3. Inject Layout Padding (The Brute Force way)
+          # 3. Smart Layout Padding (Avoids duplicate attribute error)
           layout_dir = "app/src/main/res/layout"
-          for file in os.listdir(layout_dir):
-              if file.endswith(".xml"):
-                  path = os.path.join(layout_dir, file)
-                  with open(path, "r") as f:
-                      data = f.read()
-                  # Add padding to the root container
-                  data = data.replace("xmlns:android=\"http://schemas.android.com/apk/res/android\"", 
-                                    "xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    android:paddingTop=\"32dp\"")
-                  with open(path, "w") as f:
-                      f.write(data)
+          if os.path.exists(layout_dir):
+              for file in os.listdir(layout_dir):
+                  if file.endswith(".xml"):
+                      path = os.path.join(layout_dir, file)
+                      with open(path, "r") as f:
+                          data = f.read()
+                      
+                      if "android:paddingTop" in data:
+                          # Overwrite existing padding value with 32dp
+                          data = re.sub(r"android:paddingTop=\"[^\"]*\"", "android:paddingTop=\"32dp\"", data)
+                      else:
+                          # Inject new padding after the namespace
+                          data = data.replace("xmlns:android=\"http://schemas.android.com/apk/res/android\"", 
+                                            "xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    android:paddingTop=\"32dp\"")
+                      
+                      with open(path, "w") as f:
+                          f.write(data)
+          print("Patched layouts and colors successfully.")
           '
 
       - name: Build Debug APK
