@@ -1,4 +1,4 @@
-name: Build Patched OpenTagViewer (Master Fix)
+name: Build Patched OpenTagViewer (OnePlus 15 Ultimate)
 
 on:
   workflow_dispatch:
@@ -21,53 +21,53 @@ jobs:
 
       - name: Inject Real API Keys
         run: |
-          # We use the real keys you found in the manifest
           echo "MAPS_API_KEY=AIzaSyD_Dkqs1_ySU1epRSdJDI9Slvh6gF7XhUE" > secrets.properties
           echo "AMAP_API_KEY=ad1d1be237c02bfdeb1eb21cdd75ae36" >> secrets.properties
-          
-          # Also create local.properties just in case the build script looks there
           echo "MAPS_API_KEY=AIzaSyD_Dkqs1_ySU1epRSdJDI9Slvh6gF7XhUE" > local.properties
-          echo "AMAP_API_KEY=ad1d1be237c02bfdeb1eb21cdd75ae36" >> local.properties
 
-      - name: Inject Black Bar & Force Safe Area
+      - name: Brute Force UI (Kill Cyan & Force Padding)
         run: |
           python3 -c '
           import os
 
-          # 1. Inject fitsSystemWindows="true" into ALL layouts
-          layout_dir = "app/src/main/res/layout"
-          if os.path.exists(layout_dir):
-              for file in os.listdir(layout_dir):
-                  if file.endswith(".xml"):
-                      path = os.path.join(layout_dir, file)
-                      with open(path, "r") as f:
-                          data = f.read()
-                      if "fitsSystemWindows" not in data:
-                          data = data.replace(
-                              "xmlns:android=\"http://schemas.android.com/apk/res/android\"",
-                              "xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    android:fitsSystemWindows=\"true\""
-                          )
-                          with open(path, "w") as f:
-                              f.write(data)
+          # 1. Kill Cyan by forcing ALL colors to Black/Dark Grey in colors.xml
+          color_file = "app/src/main/res/values/colors.xml"
+          if os.path.exists(color_file):
+              with open(color_file, "r") as f:
+                  data = f.read()
+              # Force typical accent colors to black
+              data = data.replace(">#FF018786<", ">#000000<") # Cyan/Teal
+              data = data.replace(">#FF03DAC5<", ">#000000<") # Light Teal
+              with open(color_file, "w") as f:
+                  f.write(data)
 
-          # 2. Inject Solid Black Status Bar & Android 15 Opt-Out
-          for val_dir in ["values", "values-night", "values-night-v27"]:
-              theme_dir = f"app/src/main/res/{val_dir}"
-              if os.path.exists(theme_dir):
-                  for file in os.listdir(theme_dir):
-                      if file == "themes.xml":
-                          path = os.path.join(theme_dir, file)
-                          with open(path, "r") as f:
-                              data = f.read()
-                          
-                          # Injects the bar and opt-out right before the style tag ends
-                          injection = """
-              <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+          # 2. Force status bar color in all themes
+          for root, dirs, files in os.walk("app/src/main/res"):
+              if "themes.xml" in files:
+                  path = os.path.join(root, "themes.xml")
+                  with open(path, "r") as f:
+                      data = f.read()
+                  injection = """
               <item name="android:statusBarColor">#000000</item>
+              <item name="android:windowLightStatusBar">false</item>
+              <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
           </style>"""
-                          data = data.replace("</style>", injection)
-                          with open(path, "w") as f:
-                              f.write(data)
+                  data = data.replace("</style>", injection)
+                  with open(path, "w") as f:
+                      f.write(data)
+
+          # 3. Inject Layout Padding (The Brute Force way)
+          layout_dir = "app/src/main/res/layout"
+          for file in os.listdir(layout_dir):
+              if file.endswith(".xml"):
+                  path = os.path.join(layout_dir, file)
+                  with open(path, "r") as f:
+                      data = f.read()
+                  # Add padding to the root container
+                  data = data.replace("xmlns:android=\"http://schemas.android.com/apk/res/android\"", 
+                                    "xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    android:paddingTop=\"32dp\"")
+                  with open(path, "w") as f:
+                      f.write(data)
           '
 
       - name: Build Debug APK
@@ -78,5 +78,5 @@ jobs:
       - name: Upload Patched APK
         uses: actions/upload-artifact@v4
         with:
-          name: OpenTagViewer-OnePlus15-Fix
+          name: OpenTagViewer-OP15-Final
           path: "**/app/build/outputs/apk/debug/*.apk"
