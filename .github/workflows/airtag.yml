@@ -20,30 +20,24 @@ jobs:
 
       - name: Patch Target SDK (Android 15 Fix)
         run: |
-          # Use find to locate build.gradle.kts anywhere in the repo
           find . -name "build.gradle.kts" -exec sed -i 's/targetSdk = 35/targetSdk = 34/g' {} +
           find . -name "build.gradle.kts" -exec sed -i 's/targetSdk(35)/targetSdk(34)/g' {} +
           echo "Target SDK 34 patch applied."
 
-      - name: Find and Fix Gradlew
+      - name: Repair/Generate Gradle Wrapper
         run: |
-          # This finds gradlew even if it's in a subfolder and makes it executable
-          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "Error: gradlew not found anywhere in the repo!"
-            exit 1
+          # If gradlew is missing, use installed 'gradle' to create it
+          if [ ! -f "gradlew" ]; then
+            echo "gradlew not found, generating fresh wrapper..."
+            gradle wrapper
           fi
-          chmod +x "$GRADLEW_PATH"
-          echo "GRADLEW_EXECUTABLE=$GRADLEW_PATH" >> $GITHUB_ENV
-          echo "Found gradlew at: $GRADLEW_PATH"
+          chmod +x gradlew
 
       - name: Build Debug APK
-        run: |
-          # Use the environment variable we just saved to run the build
-          ${{ env.GRADLEW_EXECUTABLE }} :app:assembleDebug
+        run: ./gradlew :app:assembleDebug
 
       - name: Upload Patched APK
         uses: actions/upload-artifact@v4
         with:
-          name: OpenTagViewer-A15-Fix
+          name: OpenTagViewer-Fix
           path: "**/app/build/outputs/apk/debug/*.apk"
