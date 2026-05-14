@@ -7,9 +7,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      # Explicitly clone the OpenTagViewer code, ignoring tinytailscale
+      - name: Checkout OpenTagViewer Repository
         uses: actions/checkout@v4
         with:
+          repository: SadGare/OpenTagViewer
           fetch-depth: 0
 
       - name: Set up JDK 17
@@ -22,22 +24,16 @@ jobs:
         run: |
           find . -name "build.gradle.kts" -exec sed -i 's/targetSdk = 35/targetSdk = 34/g' {} +
           find . -name "build.gradle.kts" -exec sed -i 's/targetSdk(35)/targetSdk(34)/g' {} +
-          echo "Target SDK 34 patch applied."
-
-      - name: Repair/Generate Gradle Wrapper
-        run: |
-          # If gradlew is missing, use installed 'gradle' to create it
-          if [ ! -f "gradlew" ]; then
-            echo "gradlew not found, generating fresh wrapper..."
-            gradle wrapper
-          fi
-          chmod +x gradlew
+          echo "Target SDK downgraded to 34."
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug
+        run: |
+          # Because we explicitly cloned the right repo, gradlew will be here
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug
 
       - name: Upload Patched APK
         uses: actions/upload-artifact@v4
         with:
-          name: OpenTagViewer-Fix
+          name: OpenTagViewer-A15-Fix
           path: "**/app/build/outputs/apk/debug/*.apk"
