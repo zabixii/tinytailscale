@@ -1,4 +1,4 @@
-name: Build Patched OpenTagViewer (Black Bar Fix)
+name: Build Patched OpenTagViewer (Master Fix)
 
 on:
   workflow_dispatch:
@@ -19,12 +19,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Inject Black Bar & Fix Layout Overlap
+      - name: Inject Real API Keys
+        run: |
+          # We use the real keys you found in the manifest
+          echo "MAPS_API_KEY=AIzaSyD_Dkqs1_ySU1epRSdJDI9Slvh6gF7XhUE" > secrets.properties
+          echo "AMAP_API_KEY=ad1d1be237c02bfdeb1eb21cdd75ae36" >> secrets.properties
+          
+          # Also create local.properties just in case the build script looks there
+          echo "MAPS_API_KEY=AIzaSyD_Dkqs1_ySU1epRSdJDI9Slvh6gF7XhUE" > local.properties
+          echo "AMAP_API_KEY=ad1d1be237c02bfdeb1eb21cdd75ae36" >> local.properties
+
+      - name: Inject Black Bar & Force Safe Area
         run: |
           python3 -c '
           import os
 
-          # 1. Inject fitsSystemWindows="true" into ALL layout files
+          # 1. Inject fitsSystemWindows="true" into ALL layouts
           layout_dir = "app/src/main/res/layout"
           if os.path.exists(layout_dir):
               for file in os.listdir(layout_dir):
@@ -40,7 +50,7 @@ jobs:
                           with open(path, "w") as f:
                               f.write(data)
 
-          # 2. Inject Solid Black Status Bar & Android 15 Opt-Out into ALL themes
+          # 2. Inject Solid Black Status Bar & Android 15 Opt-Out
           for val_dir in ["values", "values-night", "values-night-v27"]:
               theme_dir = f"app/src/main/res/{val_dir}"
               if os.path.exists(theme_dir):
@@ -50,7 +60,7 @@ jobs:
                           with open(path, "r") as f:
                               data = f.read()
                           
-                          # This injects the black bar and opt-out right before the style tag closes
+                          # Injects the bar and opt-out right before the style tag ends
                           injection = """
               <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
               <item name="android:statusBarColor">#000000</item>
@@ -58,7 +68,6 @@ jobs:
                           data = data.replace("</style>", injection)
                           with open(path, "w") as f:
                               f.write(data)
-          print("Successfully injected the black status bar and forced layout padding!")
           '
 
       - name: Build Debug APK
@@ -69,5 +78,5 @@ jobs:
       - name: Upload Patched APK
         uses: actions/upload-artifact@v4
         with:
-          name: OpenTagViewer-BlackBar-Fix
+          name: OpenTagViewer-OnePlus15-Fix
           path: "**/app/build/outputs/apk/debug/*.apk"
